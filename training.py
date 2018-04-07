@@ -7,10 +7,13 @@ from skimage.feature import hog
 
 import random
 import time
+import os
+import pickle
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.cross_validation import train_test_split
 from scipy.ndimage.measurements import label
+from sklearn import datasets
 
 vehicle_image_filenames = glob.glob('./vehicles/**/*.png', recursive=True)
 non_vehicle_image_filenames = glob.glob('./non-vehicles/**/*.png', recursive=True)
@@ -135,52 +138,43 @@ non_vehicle_hog_plot.imshow(non_vehicle_hog_image, cmap='gray')
 plt.show()
 # Training the model
 
-t1 = time.time()
-print ("Extracting vehicle hog features")
-vehicle_hog_features = extract_features(vehicle_image_filenames,color_space,orient,pix_per_cell,cell_per_block,hog_channel)
-
-print ("Extracting non-vehicle hog features")
-non_vehicle_hog_features = extract_features(non_vehicle_image_filenames,color_space,orient,pix_per_cell, cell_per_block, hog_channel)
-
-t2 = time.time()
-print(round(t2-t1, 2), 'Seconds to extract HOG features...')
-
-X = np.vstack((vehicle_hog_features, non_vehicle_hog_features)).astype(np.float64)
-
-X_scaler = StandardScaler().fit(X)
-
-scaled_X = X_scaler.transform(X)
-
-y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
-
-rand_state = np.random.randint(0, 100)
-
-X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.2, random_state=rand_state)
-
-print('Using:', orient, 'orientations', pix_per_cell, 'pixels per cell and', cell_per_block, 'cells per block')
-print('Training data set size: ', len(X_train))
-print('Testing data set size: ', len(X_test))
 
 # Use a Linear SVC
 svc = LinearSVC()
 
 t = time.time()
-svc.fit(X_train, y_train)
-t2 = time.time()
 
-print(round(t2-t, 2), 'Seconds to train SVC...')
-
-# Check score of SVC
-print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
-
-t = time.time()
-n_predict = 10
-
-print('My SVC predicts: ', svc.predict(X_test[0:n_predict]))
-print('For these', n_predict, 'labels: ', y_test[0:n_predict])
-
-t2 = time.time()
-print(round(t2-t, 5), 'Seconds to predict', n_predict, 'labels with SVC')
+if os.path.exists('./vehicle_detection.pkl'):
+    svc = pickle.load(open('./vehicle_detection.pkl', 'rb'))
+else:
+    t1 = time.time()
+    print ("Extracting vehicle hog features")
+    vehicle_hog_features = extract_features(vehicle_image_filenames,color_space,orient,pix_per_cell,cell_per_block,hog_channel)
+    print ("Extracting non-vehicle hog features")
+    non_vehicle_hog_features = extract_features(non_vehicle_image_filenames,color_space,orient,pix_per_cell, cell_per_block, hog_channel)
+    t2 = time.time()
+    print(round(t2-t1, 2), 'Seconds to extract HOG features...')
+    X = np.vstack((vehicle_hog_features, non_vehicle_hog_features)).astype(np.float64)
+    X_scaler = StandardScaler().fit(X)
+    scaled_X = X_scaler.transform(X)
+    y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
+    rand_state = np.random.randint(0, 100)
+    X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.2, random_state=rand_state)
+    print('Using:', orient, 'orientations', pix_per_cell, 'pixels per cell and', cell_per_block, 'cells per block')
+    print('Training data set size: ', len(X_train))
+    print('Testing data set size: ', len(X_test))
+    svc.fit(X_train, y_train)
+    pickle.dump(svc, open('./vehicle_detection.pkl', 'wb'))
+    t2 = time.time()
+    print(round(t2-t, 2), 'Seconds to train SVC...')
+    # Check score of SVC
+    print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
+    t = time.time()
+    n_predict = 10
+    print('My SVC predicts: ', svc.predict(X_test[0:n_predict]))
+    print('For these', n_predict, 'labels: ', y_test[0:n_predict])
+    t2 = time.time()
+    print(round(t2-t, 5), 'Seconds to predict', n_predict, 'labels with SVC')
 
 def draw_boxes(img, bboxes, color=(0, 255, 0), thick=3):
     draw_img = np.copy(img)
@@ -316,7 +310,7 @@ def detect_car(image_to_process):
 
 
 
-image = mpimg.imread('test_images/test1.jpg')
+image = mpimg.imread('test_images/test4.jpg')
 detected_car_image, detected_car_heatmap, detected_car_labales = detect_car(image)
 
 figure, (detected_car_image_plot, detected_car_heatmap_plot, detected_car_labales_plot) = plt.subplots(1, 3, figsize=(20,15))
